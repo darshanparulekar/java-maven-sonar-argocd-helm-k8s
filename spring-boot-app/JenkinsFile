@@ -1,9 +1,9 @@
 pipeline {
-  agent none // Set agent as 'none' to define per-stage agents
+  agent none // Set agent to none to define agents per stage
   stages {
     stage('Checkout') {
       agent {
-        docker {
+        dockerContainer {
           image 'darshanparulekar/maven-darshan-docker-agent:v1'
           args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
         }
@@ -16,7 +16,7 @@ pipeline {
 
     stage('Build and Test') {
       agent {
-        docker {
+        dockerContainer {
           image 'darshanparulekar/maven-darshan-docker-agent:v1'
           args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
         }
@@ -32,7 +32,7 @@ pipeline {
         SONAR_URL = "http://43.205.127.150:9000/"
       }
       agent {
-        docker {
+        dockerContainer {
           image 'darshanparulekar/maven-darshan-docker-agent:v1'
           args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
         }
@@ -50,7 +50,7 @@ pipeline {
         REGISTRY_CREDENTIALS = credentials('docker-cred')
       }
       agent {
-        docker {
+        dockerContainer {
           image 'darshanparulekar/maven-darshan-docker-agent:v1'
           args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
         }
