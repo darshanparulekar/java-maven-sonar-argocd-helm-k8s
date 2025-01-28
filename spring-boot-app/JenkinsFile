@@ -1,41 +1,27 @@
 pipeline {
-  agent none // Set agent as 'none' to define per-stage agents
+  agent {
+    dockerContainer {
+      image 'darshanparulekar/maven-darshan-docker-agent:v1'
+      args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket to access the host's Docker daemon
+    }
+  }
   stages {
     stage('Checkout') {
-      agent {
-        docker {
-          image 'darshanparulekar/maven-darshan-docker-agent:v1'
-          args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
-        }
-      }
       steps {
         sh 'echo passed'
         //git branch: 'main', url: 'https://github.com/darshanparulekar/java-maven-sonar-argocd-helm-k8s.git'
       }
     }
-
     stage('Build and Test') {
-      agent {
-        docker {
-          image 'darshanparulekar/maven-darshan-docker-agent:v1'
-          args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
-        }
-      }
       steps {
         sh 'ls -ltr'
+        // build the project and create a JAR file
         sh 'cd spring-boot-app && mvn clean package'
       }
     }
-
     stage('Static Code Analysis') {
       environment {
         SONAR_URL = "http://43.205.127.150:9000/"
-      }
-      agent {
-        docker {
-          image 'darshanparulekar/maven-darshan-docker-agent:v1'
-          args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
-        }
       }
       steps {
         withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
@@ -43,17 +29,11 @@ pipeline {
         }
       }
     }
-
     stage('Build and Push Docker Image') {
       environment {
         DOCKER_IMAGE = "darshanparulekar/ultimate-cicd:${BUILD_NUMBER}"
+        // DOCKERFILE_LOCATION = "spring-boot-app/Dockerfile"
         REGISTRY_CREDENTIALS = credentials('docker-cred')
-      }
-      agent {
-        docker {
-          image 'darshanparulekar/maven-darshan-docker-agent:v1'
-          args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket
-        }
       }
       steps {
         script {
@@ -65,25 +45,24 @@ pipeline {
         }
       }
     }
-
     stage('Update Deployment File') {
-      environment {
-        GIT_REPO_NAME = "java-maven-sonar-argocd-helm-k8s"
-        GIT_USER_NAME = "darshanparulekar"
-      }
-      steps {
-        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          sh '''
-              git config user.email "parulekardarshan29@gmail.com"
-              git config user.name "Darshan Parulekar"
-              BUILD_NUMBER=${BUILD_NUMBER}
-              sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
-              git add spring-boot-app-manifests/deployment.yml
-              git commit -m "Update deployment image to version ${BUILD_NUMBER}"
-              git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
-          '''
+        environment {
+            GIT_REPO_NAME = "java-maven-sonar-argocd-helm-k8s"
+            GIT_USER_NAME = "darshanparulekar"
         }
-      }
+        steps {
+            withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                sh '''
+                    git config user.email "parulekardarshan29@gmail.com"
+                    git config user.name "Darshan Parulekar"
+                    BUILD_NUMBER=${BUILD_NUMBER}
+                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+                    git add spring-boot-app-manifests/deployment.yml
+                    git commit -m "Update deployment image to version ${BUILD_NUMBER}"
+                    git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+                '''
+            }
+        }
     }
   }
 }
